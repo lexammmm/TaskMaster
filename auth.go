@@ -51,31 +51,25 @@ func GenerateJWT(user User) (string, error) {
 		return "", fmt.Errorf("JWT_SECRET is not set")
 	}
 
-	tokenString, err := token.SignedString([]byte(secretKey))
-	if err != nil {
-		return "", err
-	}
-
-	return tokenString, nil
+	return token.SignedString([]byte(secretKey))
 }
 
 func AuthenticateUser(w http.ResponseWriter, r *http.Request) {
 	var userCredentials UserCredentials
-	err := json.NewDecoder(r.Body).Decode(&userCredentials)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&userCredentials); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	user, ok := users[userCredentials.Username]
 	if !ok || user.Password != userCredentials.Password {
-		w.WriteHeader(http.StatusUnauthorized)
+		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 		return
 	}
 
 	token, err := GenerateJWT(user)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 		return
 	}
 
@@ -86,34 +80,25 @@ func JwtAuthentication(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tokenHeader := r.Header.Get("Authorization")
 		if tokenHeader == "" {
-			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprintln(w, "Missing auth token")
+			http.Error(w, "Missing auth token", http.StatusForbidden)
 			return
 		}
 
-		splitted := strings.Split(tokenHeader, " ")
-		if len(splitted) != 2 {
-			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprintln(w, "Invalid/Malformed auth token")
+		splitToken := strings.Split(tokenHeader, " ")
+		if len(splitToken) != 2 {
+			http.Error(w, "Invalid/Malformed auth token", http.StatusForbidden)
 			return
 		}
 
-		tokenPart := splitted[1] 
+		tokenPart := splitToken[1]
 
 		claims := &jwt.StandardClaims{}
 		token, err := jwt.ParseWithClaims(tokenPart, claims, func(token *jwt.Token) (interface{}, error) {
 			return []byte(os.Getenv("JWT_SECRET")), nil
 		})
 
-		if err != nil {
-			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprintf(w, "Malformed authentication token: %v", err)
-			return
-		}
-
-		if !token.Valid {
-			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprintln(w, "Token is not valid.")
+		if err != nil || !token.Valid {
+			http.Error(w, "Malformed authentication token", http.StatusForbidden)
 			return
 		}
 
@@ -130,5 +115,7 @@ func main() {
 	http.Handle("/protected", JwtAuthentication(http.HandlerFunc(TestProtectedEndpoint)))
 
 	log.Println("Listening on port :8080...")
-	http.ListenAndServe(":8080", nil)
+	if err := http.ListenAndServe(":8080", nil); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
+	}
 }
