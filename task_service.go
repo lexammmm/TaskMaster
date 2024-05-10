@@ -10,7 +10,7 @@ import (
     "github.com/joho/godotenv"
 )
 
-var tasks = []Task{}
+var taskList = []Task{}
 
 type Task struct {
     ID          string   `json:"id"`
@@ -31,36 +31,40 @@ func main() {
     }
 
     router := mux.NewRouter()
-    router.HandleFunc("/api/tasks", createTask).Methods("POST")
-    router.HandleFunc("/api/tasks", getTasks).Methods("GET")
-    router.HandleFunc("/api/tasks/{id}", getTask).Methods("GET")
-    router.HandleFunc("/api/tasks/{id}", updateTask).Methods("PUT")
-    router.HandleFunc("/api/tasks/{id}", deleteTask).Methods("DELETE")
+    setupRoutes(router)
 
     log.Printf("Server starting on port %s", port)
     http.ListenAndServe(":"+port, router)
 }
 
-func createTask(w http.ResponseWriter, r *http.Request) {
-    var task Task
-    err := json.NewDecoder(r.Body).Decode(&task)
+func setupRoutes(router *mux.Router) {
+    router.HandleFunc("/api/tasks", createTaskHandler).Methods("POST")
+    router.HandleFunc("/api/tasks", listTasksHandler).Methods("GET")
+    router.HandleFunc("/api/tasks/{id}", getTaskHandler).Methods("GET")
+    router.HandleFunc("/api/tasks/{id}", updateTaskHandler).Methods("PUT")
+    router.HandleFunc("/api/tasks/{id}", deleteTaskHandler).Methods("DELETE")
+}
+
+func createTaskHandler(w http.ResponseWriter, r *http.Request) {
+    var newTask Task
+    err := json.NewDecoder(r.Body).Decode(&newTask)
     if err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
     }
-    tasks = append(tasks, task)
+    taskList = append(taskList, newTask)
     w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(task)
+    json.NewEncoder(w).Encode(newTask)
 }
 
-func getTasks(w http.ResponseWriter, r *http.Request) {
+func listTasksHandler(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(tasks)
+    json.NewEncoder(w).Encode(taskList)
 }
 
-func getTask(w http.ResponseWriter, r *http.Request) {
+func getTaskHandler(w http.ResponseWriter, r *http.Request) {
     vars := mux.Vars(r)
-    for _, task := range tasks {
+    for _, task := range taskList {
         if task.ID == vars["id"] {
             w.Header().Set("Content-Type", "application/json")
             json.NewEncoder(w).Encode(task)
@@ -70,9 +74,9 @@ func getTask(w http.ResponseWriter, r *http.Request) {
     http.NotFound(w, r)
 }
 
-func updateTask(w http.ResponseWriter, r *http.Request) {
+func updateTaskHandler(w http.ResponseWriter, r *http.Request) {
     vars := mux.Vars(r)
-    for i, task := range tasks {
+    for i, task := range taskList {
         if task.ID == vars["id"] {
             var updatedTask Task
             err := json.NewDecoder(r.Body).Decode(&updatedTask)
@@ -80,7 +84,8 @@ func updateTask(w http.ResponseWriter, r *http.Request) {
                 http.Error(w, err.Error(), http.StatusBadRequest)
                 return
             }
-            tasks[i] = updatedTask
+            updatedTask.ID = task.ID
+            taskList[i] = updatedTask
             w.Header().Set("Content-Type", "application/json")
             json.NewEncoder(w).Encode(updatedTask)
             return
@@ -89,11 +94,11 @@ func updateTask(w http.ResponseWriter, r *http.Request) {
     http.NotFound(w, r)
 }
 
-func deleteTask(w http.ResponseWriter, r *http.Request) {
+func deleteTaskHandler(w http.ResponseWriter, r *http.Request) {
     vars := mux.Vars(r)
-    for i, task := range tasks {
+    for i, task := range taskList {
         if task.ID == vars["id"] {
-            tasks = append(tasks[:i], tasks[i+1:]...)
+            taskList = append(taskList[:i], taskList[i+1:]...)
             w.WriteHeader(http.StatusNoContent)
             return
         }
