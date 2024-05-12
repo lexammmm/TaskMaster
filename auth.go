@@ -18,7 +18,7 @@ type UserCredentials struct {
 	Password string `json:"password"`
 }
 
-type JwtToken struct {
+type TokenResponse struct {
 	Token string `json:"token"`
 }
 
@@ -27,7 +27,8 @@ type User struct {
 	Password string
 }
 
-var users = map[string]User{
+// UserStore represents a simple in-memory user database.
+var UserStore = map[string]User{
 	"user1": {Username: "user1", Password: "pass1"},
 	"user2": {Username: "user2", Password: "pass2"},
 }
@@ -38,7 +39,8 @@ func init() {
 	}
 }
 
-func GenerateJWT(user User) (string, error) {
+// GenerateToken creates a JWT token for authenticated users.
+func GenerateToken(user User) (string, error) {
 	expirationTime := time.Now().Add(5 * time.Minute)
 	claims := &jwt.StandardClaims{
 		ExpiresAt: expirationTime.Unix(),
@@ -48,49 +50,51 @@ func GenerateJWT(user User) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	secretKey := os.Getenv("JWT_SECRET")
 	if secretKey == "" {
-		return "", fmt.Errorf("JWT_SECRET is not set")
+		return "", fmt.Errorf("JWT_SECRET environment variable is not set")
 	}
 
 	return token.SignedString([]byte(secretKey))
 }
 
-func AuthenticateUser(w http.ResponseWriter, r *http.Request) {
-	var userCredentials UserCredentials
-	if err := json.NewDecoder(r.Body).Decode(&userCredentials); err != nil {
+// HandleUserAuthentication processes login requests and issues JWT tokens.
+func HandleUserAuthentication(w http.ResponseWriter, r *http.Request) {
+	var creds UserCredentials
+	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	user, ok := users[userCredentials.Username]
-	if !ok || user.Password != userCredentials.Password {
+	user, validCredentials := UserStore[creds.Username]
+	if !validCredentials || user.Password != creds.Password {
 		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 		return
 	}
 
-	token, err := GenerateJWT(user)
+	token, err := GenerateToken(user)
 	if err != nil {
 		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 		return
 	}
 
-	json.NewEncoder(w).Encode(JwtToken{Token: token})
+	json.NewEncoder(w).Encode(TokenResponse{Token: token})
 }
 
-func JwtAuthentication(next http.Handler) http.Handler {
+// RequireTokenMiddleware ensures that the requester is authenticated.
+func RequireTokenMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tokenHeader := r.Header.Get("Authorization")
-		if tokenHeader == "" {
-			http.Error(w, "Missing auth token", http.StatusForbidden)
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			http.Error(w, "Authorization token is required", http.StatusForbidden)
 			return
 		}
 
-		splitToken := strings.Split(tokenHeader, " ")
-		if len(splitToken) != 2 {
-			http.Error(w, "Invalid/Malformed auth token", http.StatusForbidden)
+		tokenSplit := strings.Split(authHeader, " ")
+		if len(tokenSplit) != 2 {
+			http.Error(w, "Invalid or malformed authorization token", http.StatusForbidden)
 			return
 		}
 
-		tokenPart := splitToken[1]
+		tokenPart := tokenSplit[1]
 
 		claims := &jwt.StandardClaims{}
 		token, err := jwt.ParseWithClaims(tokenPart, claims, func(token *jwt.Token) (interface{}, error) {
@@ -98,7 +102,7 @@ func JwtAuthentication(next http.Handler) http.Handler {
 		})
 
 		if err != nil || !token.Valid {
-			http.Error(w, "Malformed authentication token", http.StatusForbidden)
+			http.Error(w, "Invalid authentication token", http.StatusForbidden)
 			return
 		}
 
@@ -106,16 +110,17 @@ func JwtAuthentication(next http.Handler) http.Handler {
 	})
 }
 
-func TestProtectedEndpoint(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "Congratulations! This is a protected endpoint.")
+// ProtectedEndpoint demonstrates a protected API endpoint.
+func ProtectedEndpoint(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintln(w, "You've accessed a protected endpoint!")
 }
 
 func main() {
-	http.HandleFunc("/authenticate", AuthenticateUser)
-	http.Handle("/protected", JwtAuthentication(http.HandlerFunc(TestProtectedEndpoint)))
+	http.HandleFunc("/authenticate", HandleUserAuthentication)
+	http.Handle("/protected", RequireTokenMiddleware(http.HandlerFunc(ProtectedEndpoint)))
 
-	log.Println("Listening on port :8080...")
+	log.Println("Server is listening on port :8080...")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+		log.Fatalf("Unable to start server: %v", err)
 	}
 }
