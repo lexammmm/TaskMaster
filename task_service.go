@@ -5,12 +5,11 @@ import (
     "log"
     "net/http"
     "os"
+
     "github.com/google/uuid"
     "github.com/gorilla/mux"
     "github.com/joho/godotenv"
 )
-
-var taskList = []Task{}
 
 type Task struct {
     ID          string   `json:"id"`
@@ -19,6 +18,8 @@ type Task struct {
     Project     string   `json:"project"`
     AssignedTo  []string `json:"assignedTo"`
 }
+
+var taskList = []Task{}
 
 func main() {
     if err := godotenv.Load(); err != nil {
@@ -31,10 +32,7 @@ func main() {
     }
 
     router := mux.NewRouter()
-
-    // Middleware for logging HTTP requests
     router.Use(loggingMiddleware)
-
     setupRoutes(router)
 
     log.Printf("Server starting on port %s", port)
@@ -58,9 +56,9 @@ func createTaskHandler(w http.ResponseWriter, r *http.Request) {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
     }
-    // Generating a new unique ID for each task
     newTask.ID = uuid.New().String()
     taskList = append(taskList, newTask)
+
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(newTask)
 }
@@ -71,8 +69,7 @@ func listTasksHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getTaskHandler(w http.ResponseWriter, r *http.Request) {
-    vars := mux.Vars(r)
-    id := vars["id"]
+    id := mux.Vars(r)["id"]
     for _, task := range taskList {
         if task.ID == id {
             w.Header().Set("Content-Type", "application/json")
@@ -84,8 +81,7 @@ func getTaskHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func updateTaskHandler(w http.ResponseWriter, r *http.Request) {
-    vars := mux.Vars(r)
-    id := vars["id"]
+    id := mux.Vars(r)["id"]
     for i, task := range taskList {
         if task.ID == id {
             var updatedTask Task
@@ -96,6 +92,7 @@ func updateTaskHandler(w http.ResponseWriter, r *http.Request) {
             }
             updatedTask.ID = task.ID
             taskList[i] = updatedTask
+
             w.Header().Set("Content-Type", "application/json")
             json.NewEncoder(w).Encode(updatedTask)
             return
@@ -105,8 +102,7 @@ func updateTaskHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func deleteTaskHandler(w http.ResponseWriter, r *http.Request) {
-    vars := mux.Vars(r)
-    id := vars["id"]
+    id := mux.Vars(r)["id"]
     for i, task := range taskList {
         if task.ID == id {
             taskList = append(taskList[:i], taskList[i+1:]...)
@@ -117,7 +113,6 @@ func deleteTaskHandler(w http.ResponseWriter, r *http.Request) {
     http.NotFound(w, r)
 }
 
-// Logging middleware for incoming requests
 func loggingMiddleware(next http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         log.Printf("Received request: %s %s", r.Method, r.RequestURI)
