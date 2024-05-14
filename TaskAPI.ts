@@ -8,7 +8,7 @@ interface Task {
     description: string;
     completed: boolean;
     projectId?: string;
-    assignedTo?: string;
+    assignedUserId?: string;
 }
 
 interface Project {
@@ -17,40 +17,40 @@ interface Project {
     description: string;
 }
 
-class TaskService {
-    static async addTask(task: Task): Promise<Task> {
+class TaskAPI {
+    static async createTask(taskDetails: Task): Promise<Task> {
         try {
-            const response = await axios.post(`${API_BASE_URL}/tasks`, task);
+            const response = await axios.post(`${API_BASE_URL}/tasks`, taskDetails);
             return response.data;
         } catch (error) {
-            console.error('Error adding task', error);
+            console.error('Error creating task', error);
             throw error;
         }
     }
 
-    static async completeTask(taskId: string): Promise<Task> {
+    static async markTaskAsCompleted(taskId: string): Promise<Task> {
         try {
             const response = await axios.patch(`${API_BASE_URL}/tasks/${taskId}`, { completed: true });
             return response.data;
         } catch (error) {
-            console.error('Error completing task', error);
+            console.error('Error marking task as completed', error);
             throw error;
         }
     }
 
-    static async assignTaskToProject(taskId: string, projectId: string): Promise<Task> {
+    static async linkTaskToProject(taskId: string, projectId: string): Promise<Task> {
         try {
             const response = await axios.patch(`${API_BASE_URL}/tasks/${taskId}`, { projectId: projectId });
             return response.data;
         } catch (error) {
-            console.error('Error assigning task to project', error);
+            console.error('Error linking task to project', error);
             throw error;
         }
     }
 
     static async assignTaskToUser(taskId: string, userId: string): Promise<Task> {
         try {
-            const response = await axios.patch(`${API_BASE_URL}/tasks/${taskId}`, { assignedTo: userId });
+            const response = await axios.patch(`${API_BASE_URL}/tasks/${taskId}`, { assignedUserId: userId });
             return response.data;
         } catch (error) {
             console.error('Error assigning task to user', error);
@@ -59,10 +59,10 @@ class TaskService {
     }
 }
 
-class ProjectService {
-    static async createProject(project: Project): Promise<Project> {
+class ProjectAPI {
+    static async createProject(projectDetails: Project): Promise<Project> {
         try {
-            const response = await axios.post(`${API_BASE_URL}/projects`, project);
+            const response = await axios.post(`${API_BASE_URL}/projects`, projectDetails);
             return response.data;
         } catch (error) {
             console.error('Error creating project', error);
@@ -71,4 +71,4 @@ class ProjectService {
     }
 }
 
-export { TaskService, ProjectService };
+export { TaskAPI as TaskService, ProjectAPI as ProjectService };
