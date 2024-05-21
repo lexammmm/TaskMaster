@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, ChangeEvent } from "react";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -20,16 +20,14 @@ const TaskBoard: React.FC = () => {
   const [filter, setFilter] = useState<string>('');
 
   useEffect(() => {
-    const fetchProjects = async () => {
+    (async () => {
       const response = await fetch(`${API_URL}/projects`);
       const data = await response.json();
       setProjects(data);
-    };
-    
-    fetchProjects();
+    })();
   }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFilterChange = (e: ChangeEvent<HTMLInputElement>) => {
     setFilter(e.target.value);
   };
 
@@ -42,19 +40,17 @@ const TaskBoard: React.FC = () => {
 
   return (
     <div>
-      <input type="text" placeholder="Filter tasks" value={filter} onChange={handleChange} />
+      <input type="text" placeholder="Filter tasks" value={filter} onChange={handleFilterChange} />
       {filteredProjects.map(project => (
         <div key={project.id}>
           <h2>{project.name}</h2>
-          <div>
-            {project.tasks.map(task => (
-              <div key={task.id}>
-                <h3>{task.title}</h3>
-                <p>{task.description}</p>
-                <p>Status: {task.status}</p>
-              </div>
-            ))}
-          </div>
+          {project.tasks.map(task => (
+            <div key={task.id}>
+              <h3>{task.title}</h3>
+              <p>{task.description}</p>
+              <p>Status: {task.status}</p>
+            </div>
+          ))}
         </div>
       ))}
     </div>
