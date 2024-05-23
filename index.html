@@ -10,12 +10,19 @@
 
 <body>
     <div id="app">
+        <!-- New button added below -->
+        <button id="newTaskButton">Add New Task</button>
     </div>
 
     <script>
         window.env = {
             API_URL: `${process.env.API_URL}`,
         };
+
+        // Example function to show button click handling, adjust as needed.
+        document.getElementById('newTaskButton').addEventListener('click', function() {
+            alert('New Task Button Clicked!'); // Placeholder functionality
+        });
     </script>
 
     <script src="app.js"></script>
